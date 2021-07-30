@@ -104,7 +104,7 @@ def _parse(text, start, end):  # noqa: C901  # FIXME
 
 def _drop_stack(root, stack):
     if len(stack) > 1:
-        root.append({stack.pop(): stack.pop()})
+        root.setdefault(stack.pop(), []).append(stack.pop())
 
         if len(stack):
             raise errors.StackNotEmptyException('Unknown operands left on stack after assigment')
