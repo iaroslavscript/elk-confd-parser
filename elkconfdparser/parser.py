@@ -30,7 +30,7 @@ def parse(text, start=0, end=None):
 def _parse(text, start, end):  # noqa: C901  # FIXME
 
     block = _BlockType.NONE
-    root = []
+    root = {}
     current = []
     stack = []
     action = _ParserAction.NONE
