@@ -1,5 +1,7 @@
 import enum
 
+from elkconfdparser import errors
+
 
 class _BlockType(enum.Enum):
     NONE = enum.auto()
@@ -103,4 +105,6 @@ def _parse(text, start, end):  # noqa: C901  # FIXME
 def _drop_stack(root, stack):
     if len(stack) > 1:
         root.append({stack.pop(): stack.pop()})
-        stack.clear()
+
+        if len(stack):
+            raise errors.StackNotEmptyException('Unknown operands left on stack after assigment')
