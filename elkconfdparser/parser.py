@@ -1,5 +1,4 @@
 import enum
-import sys
 
 
 class _BlockType(enum.Enum):
@@ -105,45 +104,3 @@ def _drop_stack(root, stack):
     if len(stack) > 1:
         root.append({stack.pop(): stack.pop()})
         stack.clear()
-
-
-def display(data):
-
-    import json
-
-    print(json.dumps(data, indent=4, sort_keys=True))
-
-
-def main(filename):
-
-    with open(filename) as f:
-
-        text = f.read()
-        data = parse(text)
-
-        assert len(data)
-
-        data_output = data[0].get('output')
-
-        assert data_output
-
-        data_elasticsearch = list(filter(lambda x: x.get('elasticsearch'), data_output))
-
-        assert data_output
-
-        for item in data_output:
-
-            data_elasticsearch = item.get('elasticsearch')
-
-            if data_elasticsearch is not None:
-
-                host_url = list(filter(lambda x: x.get('hosts'), data_elasticsearch))
-                user = list(filter(lambda x: x.get('user'), data_elasticsearch))
-                password = list(filter(lambda x: x.get('password'), data_elasticsearch))
-
-                assert all((host_url, user, password))
-
-
-if __name__ == '__main__':
-
-    main(sys.argv[1])
