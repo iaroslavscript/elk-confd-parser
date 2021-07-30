@@ -1,2 +1,7 @@
 # elk-confd-parser
-Simple parser of ELK conf.d/* files.
+
+ElkConfdParser is a simple, tiny and fast parser configuration files for ELK stack.
+Pure python code with no external dependency.
+Lineral complexity O(N).
+
+MIT License
