@@ -34,3 +34,92 @@ class TestDropStack:
 
         assert input_root == expected_root
         assert input_stack == expected_stack
+
+
+class TestParse:
+
+    @pytest.mark.parametrize(
+        "test_input, expected",
+        [
+            ("", {}),
+            (" ", {}),
+            (" \n ", {}),
+            ("a{}", {'a': [{}]}),
+            ("aa{}", {'aa': [{}]}),
+            (" a{} ", {'a': [{}]}),
+            (" a { } ", {'a': [{}]}),
+            (" \na\n \n{\n \n}\n ", {'a': [{}]}),
+            ('a{b=>"c"}', {'a': [{'b': ['c']}]}),
+            ('\na\n\n{\nb\n=>\n"c"\n}\n', {'a': [{'b': ['c']}]}),
+        ],
+    )
+    def testSectionDetected(self, test_input, expected):
+        assert parser.parse(test_input) == expected
+
+    @pytest.mark.parametrize(
+        "test_input, expected",
+        [
+            ('b=>"c"', [{'b': ['c']}]),
+        ],
+    )
+    def testSectionValueDetection(self, test_input, expected):
+        test_input = f"a {{ {test_input} }}"
+        assert parser.parse(test_input)['a'] == expected
+
+    @pytest.mark.parametrize(
+        "test_input, expected",
+        [
+            ('"the string"', ['the string']),
+            ('"\\"quoted string\\""', ['"quoted string"']),
+            ('"middle \\"quoted\\" string"', ['middle "quoted" string']),
+            ('"unpair \\"\\"\\" string"', ['unpair """ string']),
+        ],
+    )
+    def testSectionAttrValue(self, test_input, expected):
+        test_input = f"a {{ b => {test_input} }}"
+        assert parser.parse(test_input)['a'][0]['b'] == expected
+
+    def testReal(self):
+
+        test_input = """
+        aa {
+            bb {
+                cc => "dd"
+                ee => "ff"
+            }
+
+            gg {
+                hh => "the string 1"
+                jj => "\\"with\\" quotes 1"
+            }
+
+            gg {
+                hh => "the string 2"
+                jj => "\\"with\\" quotes 2"
+            }
+        }
+        """
+        expected = {
+            "aa": [
+                {
+                    "bb": [
+                        {
+                            "cc": ["dd"],
+                            "ee": ["ff"],
+                        }
+                    ],
+                    "gg": [
+                        {
+                            "hh": ["the string 1"],
+                            "jj": ["\"with\" quotes 1"],
+                        },
+                        {
+                            "hh": ["the string 2"],
+                            "jj": ["\"with\" quotes 2"],
+                        }
+                    ]
+                }
+            ]
+        }
+
+        assert parser.parse(test_input) == expected
