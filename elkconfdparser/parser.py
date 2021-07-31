@@ -51,8 +51,10 @@ def _parse(text, start, end):  # noqa: C901  # FIXME
             action |= _ParserAction.IGNORE_SYMBOL
 
         elif block == _BlockType.STRING:
+
             if action & _ParserAction.ESCAPE_NEXT:
                 action &= ~_ParserAction.ESCAPE_NEXT
+
             else:
                 if c == '"':
                     action |= _ParserAction.DROP_VALUE
