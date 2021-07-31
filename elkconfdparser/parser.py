@@ -80,9 +80,6 @@ def _parse(text, start, end):  # noqa: C901  # FIXME
             if not (action & _ParserAction.IGNORE_SYMBOL):
                 current.append(c)
 
-            # do we ever need to add backlash ???
-            #elif action & _ParserAction.ESCAPE_NEXT:  # TODO Do we need ELIF or IF here
-            #    current.append('\\')
         else:
             if current:
                 stack.insert(0, ''.join(current))
