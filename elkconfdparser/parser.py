@@ -15,6 +15,7 @@ class _ParserAction(enum.IntFlag):
     NONE = 0
     IGNORE_SYMBOL = enum.auto()
     DROP_VALUE = enum.auto()
+    ESCAPE_NEXT = enum.auto()
 
 
 def parse(text, start=0, end=None):
@@ -50,10 +51,15 @@ def _parse(text, start, end):  # noqa: C901  # FIXME
             action |= _ParserAction.IGNORE_SYMBOL
 
         elif block == _BlockType.STRING:
-            if c == "\"":
-                action |= _ParserAction.DROP_VALUE
+            if action & _ParserAction.ESCAPE_NEXT:
+                action &= ~_ParserAction.ESCAPE_NEXT
+            else:
+                if c == '"':
+                    action |= _ParserAction.DROP_VALUE
+                elif c == "\\":
+                    action |= _ParserAction.ESCAPE_NEXT | _ParserAction.IGNORE_SYMBOL
 
-        elif c == "\"":
+        elif c == '"':
             action |= _ParserAction.IGNORE_SYMBOL
             block = _BlockType.STRING
 
@@ -73,6 +79,10 @@ def _parse(text, start, end):  # noqa: C901  # FIXME
         if not (action & _ParserAction.DROP_VALUE):
             if not (action & _ParserAction.IGNORE_SYMBOL):
                 current.append(c)
+
+            # do we ever need to add backlash ???
+            #elif action & _ParserAction.ESCAPE_NEXT:  # TODO Do we need ELIF or IF here
+            #    current.append('\\')
         else:
             if current:
                 stack.insert(0, ''.join(current))
