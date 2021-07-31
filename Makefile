@@ -1,8 +1,12 @@
 PYTHON=python3
 
-.PHONY: all build clean lint test tox
+.PHONY: all deps build clean lint test tox
 
 all: tox build
+
+deps:
+	$(PYTHON) -m pip install --upgrade pip
+	$(PYTHON) -m pip install -r requirements.txt
 
 build:
 	$(PYTHON) -m build
@@ -20,4 +24,3 @@ tox:
 
 test:
 	$(PYTHON) -m tox -e test
-
