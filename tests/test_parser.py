@@ -123,3 +123,61 @@ class TestParse:
         }
 
         assert parser.parse(test_input) == expected
+
+
+class TestTextPosition:
+
+    def testInitDefault(self):
+
+        pos = parser._TextPosition()
+
+        assert pos.symbolIndex == 0
+        assert pos.lineNo == 0
+        assert pos.lineSymbolIndex == 0
+
+    @pytest.mark.parametrize(
+        "test_input, expected",
+        [
+            ((), (0, 0, 0), ),
+            ((0, 0, 0), (0, 0, 0), ),
+            ((1, 2, 3), (1, 2, 3), ),
+            ((-1, -2, -3), (-1, -2, -3), ),
+        ]
+    )
+    def testInitArgs(self, test_input, expected):
+
+        pos = parser._TextPosition(*test_input)
+
+        assert pos.symbolIndex == expected[0]
+        assert pos.lineNo == expected[1]
+        assert pos.lineSymbolIndex == expected[2]
+
+    @pytest.mark.parametrize(
+        "test_input, expected",
+        [
+            ({}, (0, 0, 0), ),
+            ({'sym_i': 0, 'line_no': 0, 'line_i': 0}, (0, 0, 0), ),
+            ({'sym_i': 1, 'line_no': 2, 'line_i': 3}, (1, 2, 3), ),
+            ({'sym_i': -1, 'line_no': -2, 'line_i': -3}, (-1, -2, -3), ),
+        ]
+    )
+    def testInitKwargs(self, test_input, expected):
+
+        pos = parser._TextPosition(**test_input)
+
+        assert pos.symbolIndex == expected[0]
+        assert pos.lineNo == expected[1]
+        assert pos.lineSymbolIndex == expected[2]
+
+    @pytest.mark.parametrize(
+        "test_input, expected",
+        [
+            ((), (0, 0, 0), ),
+            ((0, 0, 0), (0, 0, 0), ),
+            ((1, 2, 3), (1, 2, 3), ),
+            ((-1, -2, -3), (-1, -2, -3), ),
+        ]
+    )
+    def testToTuple(self, test_input, expected):
+
+        assert parser._TextPosition(*test_input).toTuple() == expected

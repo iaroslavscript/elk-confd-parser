@@ -1,4 +1,5 @@
 import enum
+from typing import Tuple
 
 from elkconfdparser import errors
 
@@ -16,6 +17,17 @@ class _ParserAction(enum.IntFlag):
     IGNORE_SYMBOL = enum.auto()
     DROP_VALUE = enum.auto()
     ESCAPE_NEXT = enum.auto()
+
+
+class _TextPosition:
+
+    def __init__(self, sym_i: float = 0, line_no: float = 0, line_i: float = 0):
+        self.symbolIndex: float = sym_i
+        self.lineNo: float = line_no
+        self.lineSymbolIndex: float = line_i
+
+    def toTuple(self) -> Tuple[float, float, float]:
+        return self.symbolIndex, self.lineNo, self.lineSymbolIndex
 
 
 def parse(text, start=0, end=None):
