@@ -181,3 +181,19 @@ class TestTextPosition:
     def testToTuple(self, test_input, expected):
 
         assert parser._TextPosition(*test_input).toTuple() == expected
+
+    @pytest.mark.parametrize(
+        "test_input, expected",
+        [
+            ((0, 0, 0, False), (1, 0, 1), ),
+            ((0, 0, 0, True), (1, 1, 0), ),
+            ((1, 1, 1, False), (2, 1, 2), ),
+            ((1, 1, 1, True), (2, 2, 0), ),
+        ]
+    )
+    def testInc(self, test_input, expected):
+
+        p = parser._TextPosition(*test_input[:3])
+        p.inc(test_input[3])
+
+        assert p.toTuple() == expected

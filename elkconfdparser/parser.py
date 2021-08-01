@@ -26,6 +26,16 @@ class _TextPosition:
         self.lineNo: float = line_no
         self.lineSymbolIndex: float = line_i
 
+    def inc(self, prev_eol: bool = False) -> None:
+
+        self.symbolIndex += 1
+
+        if prev_eol:
+            self.lineNo += 1
+            self.lineSymbolIndex = 0
+        else:
+            self.lineSymbolIndex += 1
+
     def toTuple(self) -> Tuple[float, float, float]:
         return self.symbolIndex, self.lineNo, self.lineSymbolIndex
 
