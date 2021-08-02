@@ -26,8 +26,7 @@ def main(args: List[str]) -> None:
     with open(opts.filename) as f:  # TODO check file exists; check permittions
 
         text = f.read()
-        #data = parser.parse(text)
-        data = parser.parse_by_char(text)
+        data = parser.parse(text)
 
         display(data)
 

@@ -1,5 +1,5 @@
 import enum
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 from elkconfdparser import errors
 
@@ -55,16 +55,15 @@ def parse(text):
 def _raise_if_no_char(c: str, prev_c: str) -> None:
 
     if len(c) != 1:
-        raise ValueError('Arg "c" expected to be a string contained only one char')
+        raise errors.ElkValueError('Arg "c" expected to be a string contained only one char')
 
     if len(prev_c) != 1:
-        raise ValueError('Arg "prev_c" expected to be a string contained only one char')
+        raise errors.ElkValueError('Arg "prev_c" expected to be a string contained only one char')
 
 
-def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> List:
+def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> List:  # noqa: C901
 
     current = TokenFlag.UNKNOWN
-    result = []
 
     if prev_token in (TokenFlag.UNKNOWN, TokenFlag.END):
         if c.isspace():
@@ -86,7 +85,7 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
             current = TokenFlag.OPERATOR
 
         else:
-            raise Exception('Syntax error - Unknown token')
+            raise errors.ElkSyntaxError('Syntax error - Unknown token')
 
         buf.append(c)
 
@@ -102,14 +101,14 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
     elif prev_token == TokenFlag.STRING:
 
         if c == '\n':
-            raise Exception(f'Syntax error - string without closing quotes')
-        
+            raise errors.ElkSyntaxError('Syntax error - string without closing quotes')
+
         elif c == '"' and prev_c != '\\':
             current = TokenFlag.END
 
         else:
             current = prev_token
-            
+
         buf.append(c)
 
     elif prev_token == TokenFlag.NUMBER:
@@ -117,27 +116,19 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
             current = prev_token
 
     elif prev_token == TokenFlag.OPERATOR:
-        
+
         if prev_c == '=':
 
             if c == '>':
                 current = TokenFlag.END
                 buf.append(c)
             else:
-                raise Exception(f'Syntax error - unknown operator')
+                raise errors.ElkSyntaxError('Syntax error - unknown operator')
 
-    if current == TokenFlag.END:
-        result.append((prev_token, ''.join(buf)))
-        buf.clear()
+    else:
+        raise errors.ElkValueError('Syntax error - unknown token', prev_token)
 
-    elif current == TokenFlag.UNKNOWN:
-        result.append((prev_token, ''.join(buf)))
-        buf.clear()
-
-        current, data = _tokenise(c, prev_c, buf, current)
-        result.extend(data)
-
-    return current, result
+    return current
 
 
 def _parse_char(c: str, prev_c: str, pos: TextPos, buf: List[str], prev_token: TokenFlag) -> None:
@@ -146,6 +137,20 @@ def _parse_char(c: str, prev_c: str, pos: TextPos, buf: List[str], prev_token: T
 
     pos.inc(prev_c == '\n')
 
-    token, tokens = _tokenise(c, prev_c, buf, prev_token)
+    result = []
+    token = _tokenise(c, prev_c, buf, prev_token)
 
-    return token, tokens
+    if token == TokenFlag.END:
+        result.append((prev_token, ''.join(buf)))
+        buf.clear()
+
+    elif token == TokenFlag.UNKNOWN:
+        result.append((prev_token, ''.join(buf)))
+        buf.clear()
+
+        token = _tokenise(c, prev_c, buf, token)
+        
+        result.append((prev_token, ''.join(buf)))
+        buf.clear()
+
+    return token, result
