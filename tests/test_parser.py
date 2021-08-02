@@ -197,3 +197,38 @@ class TestTextPosition:
         p.inc(test_input[3])
 
         assert p.toTuple() == expected
+
+
+class TestRaiseIfNoChar:
+
+    @pytest.mark.parametrize(
+        "test_input",
+        [
+            ('a', 'a'),
+            ('a', 'b'),
+            (' ', ' '),
+            ('\n', '\n'),
+            ('\t', '\t'),
+        ]
+    )
+    def testNotRaised(self, test_input) -> None:
+
+        parser._raise_if_no_char(*test_input)
+
+    @pytest.mark.parametrize(
+        "test_input",
+        [
+            ('', '', 'c'),
+            ('', 'a', 'c'),
+            ('a', '', 'prev_c'),
+            ('a', 'aa', 'prev_c'),
+            ('aa', 'a', 'c'),
+            ('aa', 'aa', 'c'),
+        ]
+    )
+    def testRaised(self, test_input) -> None:
+
+        c, prev_c, name = test_input
+
+        with pytest.raises(ValueError, match=f'.*"{name}".*'):
+            parser._raise_if_no_char(c, prev_c)

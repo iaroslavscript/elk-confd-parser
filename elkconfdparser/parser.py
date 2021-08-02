@@ -1,36 +1,32 @@
 import enum
-from typing import Tuple
+from typing import Dict, List, Tuple
 
 from elkconfdparser import errors
 
 
-class _BlockType(enum.Enum):
-    NONE = enum.auto()
+class TokenFlag(enum.Enum):
+    UNKNOWN = enum.auto()
+    SPACE = enum.auto()
     COMMENT = enum.auto()
+    IDENTIFIER = enum.auto()
     STRING = enum.auto()
-    VARIABLE = enum.auto()
-    IGNORED = enum.auto()
+    NUMBER = enum.auto()
+    OPERATOR = enum.auto()
+    END = enum.auto()
 
 
-class _ParserAction(enum.IntFlag):
-    NONE = 0
-    IGNORE_SYMBOL = enum.auto()
-    DROP_VALUE = enum.auto()
-    ESCAPE_NEXT = enum.auto()
-
-
-class _TextPosition:
+class TextPos:
 
     def __init__(self, sym_i: float = 0, line_no: float = 0, line_i: float = 0):
         self.symbolIndex: float = sym_i
         self.lineNo: float = line_no
         self.lineSymbolIndex: float = line_i
 
-    def inc(self, prev_eol: bool = False) -> None:
+    def inc(self, new_line: bool = False) -> None:
 
         self.symbolIndex += 1
 
-        if prev_eol:
+        if new_line:
             self.lineNo += 1
             self.lineSymbolIndex = 0
         else:
@@ -40,102 +36,116 @@ class _TextPosition:
         return self.symbolIndex, self.lineNo, self.lineSymbolIndex
 
 
-def parse(text, start=0, end=None):
+def parse(text):
 
-    if end is None:
-        end = len(text)-1
+    buf: List[str] = []
+    pos: TextPos = TextPos()
+    prev_c: str = '\n'
+    token = TokenFlag.UNKNOWN
 
-    result = _parse(text, start, end)[0]
+    for c in text:
+        token, tokens = _parse_char(c, prev_c, pos, buf, token)
+        prev_c = c
 
-    return result
+        for x in tokens:
+            if x[0] != TokenFlag.SPACE:
+                print(f'{pos.toTuple()}\t{x[0].name[:6]}  {x[1]}')
 
 
-def _parse(text, start, end):  # noqa: C901  # FIXME
+def _raise_if_no_char(c: str, prev_c: str) -> None:
 
-    block = _BlockType.NONE
-    root = {}
-    current = []
-    stack = []
-    action = _ParserAction.NONE
-    delta = 0
+    if len(c) != 1:
+        raise ValueError('Arg "c" expected to be a string contained only one char')
 
-    i = start
-    while i <= end:
+    if len(prev_c) != 1:
+        raise ValueError('Arg "prev_c" expected to be a string contained only one char')
 
-        delta = 0
-        action &= ~_ParserAction.IGNORE_SYMBOL
-        c = text[i]
 
-        if c == "\n":
-            action |= _ParserAction.DROP_VALUE
+def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> List:
 
-        elif block == _BlockType.COMMENT:
-            action |= _ParserAction.IGNORE_SYMBOL
+    current = TokenFlag.UNKNOWN
+    result = []
 
-        elif block == _BlockType.STRING:
+    if prev_token in (TokenFlag.UNKNOWN, TokenFlag.END):
+        if c.isspace():
+            current = TokenFlag.SPACE
 
-            if action & _ParserAction.ESCAPE_NEXT:
-                action &= ~_ParserAction.ESCAPE_NEXT
+        elif c.isalpha():
+            current = TokenFlag.IDENTIFIER
 
-            else:
-                if c == '"':
-                    action |= _ParserAction.DROP_VALUE
-                elif c == "\\":
-                    action |= _ParserAction.ESCAPE_NEXT | _ParserAction.IGNORE_SYMBOL
+        elif c.isdigit():
+            current = TokenFlag.NUMBER
+
+        elif c == '#':
+            current = TokenFlag.COMMENT
 
         elif c == '"':
-            action |= _ParserAction.IGNORE_SYMBOL
-            block = _BlockType.STRING
+            current = TokenFlag.STRING
 
-        elif c == "#":
-            action |= _ParserAction.IGNORE_SYMBOL
-            block = _BlockType.COMMENT
-
-        elif c.isspace() or c in "=>,{}[]":
-            action |= _ParserAction.DROP_VALUE
-
-        elif c.isidentifier():
-            block = _BlockType.VARIABLE
+        elif c in '={}[],':
+            current = TokenFlag.OPERATOR
 
         else:
-            action |= _ParserAction.IGNORE_SYMBOL
+            raise Exception('Syntax error - Unknown token')
 
-        if not (action & _ParserAction.DROP_VALUE):
-            if not (action & _ParserAction.IGNORE_SYMBOL):
-                current.append(c)
+        buf.append(c)
+
+    elif prev_token == TokenFlag.SPACE:
+        if c.isspace():
+            current = prev_token
+            buf.append(c)
+
+    elif prev_token == TokenFlag.IDENTIFIER:
+        if c.isalnum():  # no need to use c.isidentifier as we already know that it's not a first symbol
+            current = prev_token
+
+    elif prev_token == TokenFlag.STRING:
+
+        if c == '\n':
+            raise Exception(f'Syntax error - string without closing quotes')
+        
+        elif c == '"' and prev_c != '\\':
+            current = TokenFlag.END
 
         else:
-            if current:
-                stack.insert(0, ''.join(current))
-                current.clear()
-                _drop_stack(root, stack)
+            current = prev_token
+            
+        buf.append(c)
 
-            action &= ~_ParserAction.DROP_VALUE
-            block = _BlockType.NONE
+    elif prev_token == TokenFlag.NUMBER:
+        if c.isnumeric():  # no need to use c.isidentifier as we already know that it's not a first symbol
+            current = prev_token
 
-        if block != _BlockType.COMMENT and block != _BlockType.STRING:
-            if c == '[':                    # Today I have no time to fix it
-                block = _BlockType.IGNORED  # so for now list types are silently ignored
-            elif c == ']':                  #
-                block = _BlockType.NONE     #
-                stack.insert(0, None)       #
-                _drop_stack(root, stack)
-            elif c == '{':
-                data, delta = _parse(text, i+1, end)
-                stack.insert(0, data)
-                _drop_stack(root, stack)
+    elif prev_token == TokenFlag.OPERATOR:
+        
+        if prev_c == '=':
 
-            elif c == '}':
-                return root, i
+            if c == '>':
+                current = TokenFlag.END
+                buf.append(c)
+            else:
+                raise Exception(f'Syntax error - unknown operator')
 
-        i = max(i, delta) + 1
+    if current == TokenFlag.END:
+        result.append((prev_token, ''.join(buf)))
+        buf.clear()
 
-    return root, i
+    elif current == TokenFlag.UNKNOWN:
+        result.append((prev_token, ''.join(buf)))
+        buf.clear()
+
+        current, data = _tokenise(c, prev_c, buf, current)
+        result.extend(data)
+
+    return current, result
 
 
-def _drop_stack(root, stack):
-    if len(stack) > 1:
-        root.setdefault(stack.pop(), []).append(stack.pop())
+def _parse_char(c: str, prev_c: str, pos: TextPos, buf: List[str], prev_token: TokenFlag) -> None:
 
-        if len(stack):
-            raise errors.StackNotEmptyException('Unknown operands left on stack after assigment')
+    _raise_if_no_char(c, prev_c)
+
+    pos.inc(prev_c == '\n')
+
+    token, tokens = _tokenise(c, prev_c, buf, prev_token)
+
+    return token, tokens
