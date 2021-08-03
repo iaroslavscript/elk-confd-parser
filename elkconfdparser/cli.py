@@ -21,19 +21,18 @@ def main(args: List[str]) -> None:
 
     arg_parser: argparse.ArgumentParser = create_parser()
     arg_parser.add_argument("filename")  # TODO add read from stdin
+    arg_parser.add_argument("--debug-c")
+    arg_parser.add_argument("--debug-i")
+
     opts = arg_parser.parse_args(args)
+
+    opts.debug_c = opts.debug_c.split(',') if opts.debug_c is not None else []
+    opts.debug_i = opts.debug_i.split(',') if opts.debug_i is not None else []
 
     with open(opts.filename) as f:  # TODO check file exists; check permittions
 
         text = f.read()
-        data = parser.parse(text)
-
-        display(data)
-
-
-def display(data):
-
-    print(json.dumps(data, indent=4, sort_keys=True))
+        parser.parse(text, opts.debug_c, opts.debug_i)
 
 
 if __name__ == "__main__":  # noqa
