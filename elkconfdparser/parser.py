@@ -6,14 +6,38 @@ from elkconfdparser import errors
 
 class TokenFlag(enum.IntFlag):
     UNKNOWN = enum.auto()
+
+    """multichar unknown sequence"""
+    UNKNOWN_SEQ = enum.auto()
+
     SPACE = enum.auto()
     COMMENT = enum.auto()
     IDENTIFIER = enum.auto()
     STRING = enum.auto()
+    STRING_SQ = enum.auto()
     NUMBER = enum.auto()
-    OPERATOR = enum.auto()
+
+    """assign"""
+    OPERATOR_ASG = enum.auto()
+
+    """curly brace open"""
+    OPERATOR_CBO = enum.auto()
+
+    """curly brace open"""
+    OPERATOR_CBC = enum.auto()
+
+    """square brackets open"""
+    OPERATOR_SBO = enum.auto()
+
+    """square brackets close"""
+    OPERATOR_SBC = enum.auto()
+
+    """operator comma"""
+    OPERATOR_COMMA = enum.auto()
+
+    FLAG_PREV_END = enum.auto()
     FLAG_END = enum.auto()
-    FLAG_ALL = FLAG_END
+    FLAG_ALL = FLAG_PREV_END | FLAG_END
 
 
 class TextPos:
@@ -77,7 +101,8 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
 
     current = TokenFlag.UNKNOWN
 
-    if (prev_token == TokenFlag.UNKNOWN) or (prev_token & TokenFlag.FLAG_END):
+    if  prev_token & (TokenFlag.UNKNOWN | TokenFlag.FLAG_END | TokenFlag.FLAG_PREV_END):
+
         if c.isspace():
             current = TokenFlag.SPACE
 
@@ -93,11 +118,26 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
         elif c == '"':
             current = TokenFlag.STRING
 
-        elif c == '=':
-            current = TokenFlag.OPERATOR
+        elif c == '\'':
+            current = TokenFlag.STRING_SQ
 
-        elif c in '{}[],':
-            current = TokenFlag.OPERATOR | TokenFlag.FLAG_END
+        elif c == '=':
+            current = TokenFlag.UNKNOWN_SEQ
+
+        elif c in '{':
+            current = TokenFlag.OPERATOR_CBO | TokenFlag.FLAG_END
+
+        elif c in '}':
+            current = TokenFlag.OPERATOR_CBC | TokenFlag.FLAG_END
+
+        elif c in '[':
+            current = TokenFlag.OPERATOR_SBO | TokenFlag.FLAG_END
+
+        elif c in ']':
+            current = TokenFlag.OPERATOR_SBC | TokenFlag.FLAG_END
+
+        elif c in ',':
+            current = TokenFlag.OPERATOR_COMMA | TokenFlag.FLAG_END
 
         else:
             raise errors.ElkSyntaxError('Syntax error - Unknown token')
@@ -109,10 +149,22 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
             current = prev_token
             buf.append(c)
 
+        else:
+            current |= TokenFlag.FLAG_PREV_END
+
+    elif prev_token == TokenFlag.COMMENT:
+
+        if c == '\n':
+            current = TokenFlag.SPACE | TokenFlag.FLAG_PREV_END
+        else:
+            current |= TokenFlag.FLAG_PREV_END
+
     elif prev_token == TokenFlag.IDENTIFIER:
         if c.isalnum():  # no need to use c.isidentifier as we already know that it's not a first symbol
             current = prev_token
             buf.append(c)
+        else:
+            current |= TokenFlag.FLAG_PREV_END
 
     elif prev_token == TokenFlag.STRING:
 
@@ -127,20 +179,34 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
 
         buf.append(c)
 
+    elif prev_token == TokenFlag.STRING_SQ:
+
+        if c == '\n':
+            raise errors.ElkSyntaxError('Syntax error - string without closing quotes')
+
+        elif c == '\'' and prev_c != '\\':
+            current = prev_token | TokenFlag.FLAG_END
+
+        else:
+            current = prev_token
+
+        buf.append(c)
+
     elif prev_token == TokenFlag.NUMBER:
         if c.isnumeric():  # no need to use c.isidentifier as we already know that it's not a first symbol
             current = prev_token
             buf.append(c)
+        else:
+            current |= TokenFlag.FLAG_PREV_END
 
-    elif prev_token == TokenFlag.OPERATOR:
+    elif prev_token & TokenFlag.UNKNOWN_SEQ:
 
-        if prev_c == '=':
+        if c == '>' and prev_c == '=':
 
-            if c == '>':
-                current = prev_token | TokenFlag.FLAG_END
-                buf.append(c)
-            else:
-                raise errors.ElkSyntaxError('Syntax error - unknown operator')
+            current = TokenFlag.OPERATOR_ASG | TokenFlag.FLAG_END
+            buf.append(c)
+        else:
+            raise errors.ElkSyntaxError('Syntax error - unknown operator ', c)
 
     else:
         raise errors.ElkValueError('Syntax error - wrong token id', prev_token)
@@ -151,28 +217,27 @@ def _tokenise(c: str, prev_c: str, buf: List[str], prev_token: TokenFlag) -> Lis
 def _collect_token(c: str, prev_c: str, pos: TextPos, buf: List[str], prev_token: TokenFlag) -> None:
 
     result = []
+    token = TokenFlag.UNKNOWN
 
     for i in range(2):
 
         token = _tokenise(c, prev_c, buf, prev_token)
 
-        if token == TokenFlag.UNKNOWN:
-            result.append((prev_token, ''.join(buf)))
+        if token & TokenFlag.FLAG_PREV_END:
+            result.append((prev_token & ~TokenFlag.FLAG_ALL, ''.join(buf)))
             buf.clear()
-            prev_token = token
 
-        elif token & TokenFlag.FLAG_END:
+        if token & TokenFlag.FLAG_END:
             result.append((token & ~TokenFlag.FLAG_ALL, ''.join(buf)))
             buf.clear()
-            prev_token = token
+
+        prev_token = token
+
+        if not (token & TokenFlag.UNKNOWN):
             break
 
-        else:
-            prev_token = token
-            break
-
-    if prev_token == TokenFlag.UNKNOWN:
-        raise errors.ElkValueError('Syntax error - unknown token')
+    if token & TokenFlag.UNKNOWN:
+        raise errors.ElkValueError('Syntax error - unknown token ', token)
 
     return token, result
 
